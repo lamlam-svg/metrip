@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="theme-color" content="#f0f0f0">
+    <title>Smart Trip Planner | 工業風旅記</title>
+    
+    <link rel="apple-touch-icon" href="https://img.icons8.com/fluency/192/suitcase.png">
+    <link rel="icon" href="https://img.icons8.com/fluency/192/suitcase.png">
+
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@500;700;900&family=Roboto:wght@900&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --bg-color: #f0f0f0;
+            --border-color: #1a1a1a;
+            --accent-color: #FF5722;
+            --secondary-color: #333;
+            --shadow-offset: 5px;
+        }
+
+        /* 避免 iOS 點擊閃爍 */
+        * { box-sizing: border-box; user-select: none; -webkit-tap-highlight-color: transparent; outline: none; }
+
+        body {
+            margin: 0; padding: 0;
+            background-color: var(--bg-color);
+            background-image: url('https://www.transparenttextures.com/patterns/white-marble.png'); 
+            font-family: 'Roboto', 'Noto Sans TC', sans-serif;
+            color: var(--border-color);
+            padding-bottom: 100px;
+            /* 讓全螢幕模式上方不留白 */
+            padding-top: env(safe-area-inset-top);
+        }
+
+        /* --- 工業風元件 --- */
+        .hard-box {
+            background: white;
+            border: 3px solid var(--border-color);
+            box-shadow: var(--shadow-offset) var(--shadow-offset) 0px var(--border-color);
+            transition: transform 0.1s, box-shadow 0.1s;
+            margin-bottom: 15px;
+            position: relative;
+        }
+        .hard-box:active {
+            transform: translate(2px, 2px);
+            box-shadow: 2px 2px 0px var(--border-color);
+        }
+        
+        .btn-main, .btn-action {
+            background: var(--border-color); color: white;
+            text-transform: uppercase; font-weight: 900;
+            text-align: center; padding: 12px; cursor: pointer;
+            display: inline-block; width: 100%; border: none;
+        }
+        .btn-accent { background: var(--accent-color); color: white; }
+        .btn-delete { background: #ff4444; color: white; width: auto; padding: 5px 10px; font-size: 0.8rem; margin-left: auto;}
+
+        /* --- 格線與佈局 --- */
+        .grid-container {
+            display: grid; grid-template-columns: 1fr 1fr;
+            gap: 15px; padding: 20px; max-width: 600px; margin: 0 auto;
+        }
+        .grid-item {
+            padding: 15px; display: flex; flex-direction: column;
+            justify-content: center; align-items: center;
+            font-weight: 900; min-height: 100px; text-align: center;
+            font-size: 1rem; cursor: pointer;
+        }
+        .item-full { grid-column: span 2; }
+        .item-title { background: var(--border-color); color: var(--accent-color); }
+        
+        /* --- 頁面系統 --- */
+        .page { display: none; padding: 20px; max-width: 600px; margin: 0 auto; }
+        .page.active { display: block; animation: fadeIn 0.3s; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        h2 { border-bottom: 4px solid var(--accent-color); display: inline-block; margin-top: 0; }
+        .back-btn { margin-bottom: 15px; cursor: pointer; width: auto; padding: 5px 15px; font-weight: bold; display: inline-block;}
+
+        /* --- 列表樣式 --- */
+        .list-item { padding: 15px; display: flex; align-items: center; justify-content: space-between; gap: 10px;}
+        .list-content { flex: 1; }
+        .sub-text { font-size: 0.85rem; color: #666; margin-top: 4px; }
+        
+        /* --- 計算機 --- */
+        .calc-display { font-size: 2rem; padding: 10px; text-align: right; font-family: monospace; background: #eee; border-bottom: 3px solid black; }
+        .calc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 10px;}
+        .calc-btn { padding: 15px; font-size: 1.2rem; font-weight: bold; text-align: center; background: white; border: 2px solid black; cursor: pointer; }
+        
+        /* --- 彈出視窗 --- */
+        .modal-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center;
+        }
+        .modal-overlay.active { display: flex; }
+        .modal-content { width: 90%; max-width: 400px; padding: 20px; max-height: 80vh; overflow-y: auto; }
+        .input-group { margin-bottom: 15px; }
+        .input-group label { display: block; font-weight: bold; margin-bottom: 5px; }
+        .input-group input, textarea, select {
+            width: 100%; padding: 10px; border: 2px solid black; font-size: 1rem; font-family: inherit; background: #fff;
+        }
+
+        /* --- 懸浮按鈕 --- */
+        .fab-group { position: fixed; bottom: 30px; right: 20px; display: flex; flex-direction: column; gap: 15px; z-index: 500; }
+        .fab-btn {
+            width: 60px; height: 60px; border-radius: 50%; border: 3px solid white;
+            display: flex; align-items: center; justify-content: center; font-size: 1.8rem;
+            box-shadow: 4px 4px 0 rgba(0,0,0,0.5); cursor: pointer;
+        }
+        .fab-add { background: var(--accent-color); color: white; }
+
+        /* --- 頂部旅程切換 --- */
+        .trip-selector {
+            background: #fff; border-bottom: 3px solid #000; padding: 10px; text-align: center;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            padding-top: max(10px, env(safe-area-inset-top)); /* 避開瀏海 */
+        }
+    </style>
+</head>
+<body>
+
+    <div class="trip-selector">
+        <span style="font-weight:bold;">旅程：</span>
+        <select id="trip-select" onchange="switchTrip()" style="width: auto; padding: 5px; border: 2px solid #000; font-weight:bold;">
+            <option value="">載入中...</option>
+        </select>
+        <button onclick="openModal('new-trip')" style="background:var(--accent-color); color:white; border:2px solid #000; font-weight:bold;">+</button>
+    </div>
+
+    <div id="home" class="page active">
+        <div style="text-align:center; margin: 20px 0;">
+            <h1 id="home-title" style="margin:0; text-transform:uppercase;">TRIP PLANNER</h1>
+            <div id="home-dates" style="color:#666; font-weight:bold;">--/-- ~ --/--</div>
+        </div>
+
+        <div id="weather-box" class="hard-box" style="padding:15px; background:#e3f2fd; border-color:#2196f3; color:#0d47a1; display:none;">
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div>
+                    <strong id="w-city">--</strong>
+                    <div id="w-desc">載入中...</div>
+                </div>
+                <div id="w-temp" style="font-size: 2rem; font-weight:900;">--°C</div>
+            </div>
+        </div>
+        
+        <div class="grid-container">
+            <div class="grid-item hard-box item-full item-title" onclick="showPage('itinerary')">
+                <span class="label">🗓️ 行程表</span>
+            </div>
+            <div class="grid-item hard-box" onclick="showPage('expense')"><span>💰 記帳</span></div>
+            <div class="grid-item hard-box" onclick="showPage('packing')"><span>🎒 行李</span></div>
+            <div class="grid-item hard-box" onclick="showPage('transport')"><span>🚆 交通</span></div>
+            <div class="grid-item hard-box" onclick="showPage('hotels')"><span>🏨 住宿</span></div>
+            <div class="grid-item hard-box" onclick="showPage('restaurants')"><span>🍜 餐廳</span></div>
+            <div class="grid-item hard-box" onclick="showPage('shopping')"><span>🛍️ 購物</span></div>
+            <div class="grid-item hard-box" style="background:#000; color:#fff;" onclick="showPage('emergency')"><span>🆘 緊急</span></div>
+        </div>
+    </div>
+
+    <div class="fab-group">
+        <div id="global-add-btn" class="fab-btn fab-add" onclick="openCurrentModal()" style="display:none;">+</div>
+    </div>
+
+    <div id="generic-page" class="page">
+        <div class="hard-box back-btn" onclick="showPage('home')">← 回首頁</div>
+        <h2 id="page-title">標題</h2>
+        
+        <div id="expense-panel" style="display:none;">
+            <div class="hard-box" style="padding: 15px;">
+                <input type="text" id="exp-name" placeholder="項目 (例: 拉麵)" style="margin-bottom:10px;">
+                
+                <div style="display:flex; flex-direction:column; gap:5px; margin-bottom:10px; background:#eee; padding:10px; border:2px solid #000;">
+                    <div style="display:flex; align-items:center; justify-content:space-between;">
+                        <span style="font-weight:bold; font-size:0.8rem;">消費 (來源):</span>
+                        <select id="currency-select" style="font-weight:bold;" onchange="fetchRate()">
+                            <option value="JPY">🇯🇵 日幣 (JPY)</option>
+                            <option value="KRW">🇰🇷 韓元 (KRW)</option>
+                            <option value="USD">🇺🇸 美金 (USD)</option>
+                            <option value="EUR">🇪🇺 歐元 (EUR)</option>
+                            <option value="CNY">🇨🇳 人民幣 (CNY)</option>
+                            <option value="HKD">🇭🇰 港幣 (HKD)</option>
+                            <option value="THB">🇹🇭 泰銖 (THB)</option>
+                            <option value="TWD">🇹🇼 台幣 (TWD)</option>
+                        </select>
+                    </div>
+                    
+                    <div style="display:flex; align-items:center; justify-content:space-between; margin-top:5px; border-top:1px dashed #999; padding-top:5px;">
+                        <span style="font-weight:bold; font-size:0.8rem; color:var(--accent-color);">換算 (本金):</span>
+                        <select id="target-currency" style="font-weight:bold;" onchange="fetchRate()">
+                            <option value="HKD">🇭🇰 港幣 (HKD)</option>
+                            <option value="TWD">🇹🇼 台幣 (TWD)</option>
+                            <option value="USD">🇺🇸 美金 (USD)</option>
+                        </select>
+                    </div>
+                    <button onclick="fetchRate()" style="width:100%; background:#000; color:#fff; border:none; padding:8px; cursor:pointer; font-weight:bold; margin-top:5px;">🔄 更新匯率</button>
+                </div>
+
+                <div style="display:flex; gap:10px; margin-bottom:10px;">
+                    <div style="flex:1;">
+                        <label id="rate-label" style="font-size:0.8rem; color:#666;">匯率</label>
+                        <input type="number" id="exp-rate" value="1" placeholder="匯率">
+                    </div>
+                    <div style="flex:1; text-align:right; font-weight:bold; font-size:1.2rem; padding-top:22px;">
+                        <span id="target-symbol">HKD</span> <span id="exp-final" style="color:var(--accent-color);">0</span>
+                    </div>
+                </div>
+
+                <div class="calc-display" id="calc-screen">0</div>
+                <div class="calc-grid">
+                    <div class="calc-btn" onclick="calc('7')">7</div><div class="calc-btn" onclick="calc('8')">8</div><div class="calc-btn" onclick="calc('9')">9</div><div class="calc-btn" onclick="calc('C')">C</div>
+                    <div class="calc-btn" onclick="calc('4')">4</div><div class="calc-btn" onclick="calc('5')">5</div><div class="calc-btn" onclick="calc('6')">6</div><div class="calc-btn btn-accent" onclick="saveExpense()">記</div>
+                    <div class="calc-btn" onclick="calc('1')">1</div><div class="calc-btn" onclick="calc('2')">2</div><div class="calc-btn" onclick="calc('3')">3</div><div class="calc-btn" onclick="calc('0')">0</div>
+                </div>
+            </div>
+            <h3>歷史紀錄</h3>
+        </div>
+
+        <div id="transport-panel" style="display:none;">
+            <div class="hard-box" style="padding:15px; background:#e8f5e9;">
+                <input type="text" id="nav-from" placeholder="起點 (留空為目前位置)" style="margin-bottom:10px;">
+                <input type="text" id="nav-to" placeholder="終點 (例: 東京鐵塔)">
+                
+                <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:10px; margin-top:10px;">
+                    <button class="btn-main" onclick="startNav('google')" style="background:#4285F4; color:white; padding:10px 5px;">Google</button>
+                    <button class="btn-main" onclick="startNav('apple')" style="background:#000; color:white; padding:10px 5px;">Apple</button>
+                    <button class="btn-main" onclick="startNav('amap')" style="background:#FF5722; color:white; padding:10px 5px;">高德</button>
+                </div>
+            </div>
+            <h3>票券與筆記</h3>
+        </div>
+
+        <div id="privacy-panel" style="display:none; margin-bottom:20px;">
+            <button class="hard-box btn-main" onclick="togglePrivacy()">👁️ 顯示/隱藏 敏感資料</button>
+        </div>
+
+        <div id="list-container" style="padding-bottom:80px;"></div>
+    </div>
+
+    <div id="modal-new-trip" class="modal-overlay">
+        <div class="hard-box modal-content">
+            <h3>✈️ 建立新旅程</h3>
+            <div class="input-group"><label>旅程名稱</label><input type="text" id="new-trip-name" placeholder="例：2025 大阪賞櫻"></div>
+            <div class="input-group"><label>日期</label><input type="text" id="new-trip-date" placeholder="例：2025/04/01"></div>
+            
+            <div class="input-group">
+                <label>天氣定位 (經緯度)</label>
+                <div style="display:flex; gap:5px;">
+                    <input type="text" id="new-trip-loc" placeholder="35.689, 139.691">
+                    <button onclick="getGPS()" style="width:60px; background:#000; color:#fff; border:none;">📍</button>
+                </div>
+                <div style="font-size:0.8rem; color:#666;">點擊按鈕自動抓取目前位置</div>
+            </div>
+
+            <button class="btn-main btn-accent" onclick="createTrip()">建立並切換</button>
+            <button class="btn-main" onclick="closeModal()" style="margin-top:10px; background:#ccc; color:#000;">取消</button>
+        </div>
+    </div>
+
+    <div id="modal-add-item" class="modal-overlay">
+        <div class="hard-box modal-content">
+            <h3 id="add-modal-title">新增項目</h3>
+            <div id="dynamic-fields"></div>
+            <button class="btn-main btn-accent" onclick="saveItem()">儲存</button>
+            <button class="btn-main" onclick="closeModal()" style="margin-top:10px; background:#ccc; color:#000;">取消</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, push, onValue, remove, set, update } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        // 🔥 設定區：請填入您的 Firebase Config 🔥
+        const firebaseConfig = {
+            apiKey: "AIzaSyAyaO8rBUNZK8X4OjBNIGB54ci_YaCUZbM",
+            authDomain: "trip-2cc98.firebaseapp.com",
+            databaseURL: "https://trip-2cc98-default-rtdb.firebaseio.com",
+            projectId: "trip-2cc98",
+            storageBucket: "trip-2cc98.firebasestorage.app",
+            messagingSenderId: "743503694620",
+            appId: "1:743503694620:web:6a63622298993e8755c8d9"
+        };
+
+        let db;
+        let currentTripId = localStorage.getItem("lastTripId") || "";
+        let currentCategory = "";
+
+        try {
+            const app = initializeApp(firebaseConfig);
+            db = getDatabase(app);
+            initApp();
+        } catch (e) {
+            alert("Firebase 連線失敗，請檢查 Key");
+        }
+
+        // --- 初始化與旅程管理 ---
+        function initApp() {
+            onValue(ref(db, 'trips_meta'), (snapshot) => {
+                const select = document.getElementById('trip-select');
+                select.innerHTML = "";
+                const data = snapshot.val();
+                
+                if (data) {
+                    Object.entries(data).forEach(([id, info]) => {
+                        const opt = document.createElement('option');
+                        opt.value = id;
+                        opt.text = info.name;
+                        select.appendChild(opt);
+                    });
+                    
+                    if (currentTripId && data[currentTripId]) {
+                        select.value = currentTripId;
+                    } else {
+                        currentTripId = Object.keys(data)[0];
+                        select.value = currentTripId;
+                    }
+                    loadTripData();
+                } else {
+                    select.innerHTML = "<option>請新增旅程</option>";
+                    openModal('new-trip');
+                }
+            });
+            setTimeout(fetchRate, 1000); // 預設抓匯率
+        }
+
+        window.createTrip = () => {
+            const name = document.getElementById('new-trip-name').value;
+            const date = document.getElementById('new-trip-date').value;
+            const loc = document.getElementById('new-trip-loc').value;
+            
+            if(!name) return alert("請輸入旅程名稱");
+            
+            const newTripRef = push(ref(db, 'trips_meta'));
+            const tripId = newTripRef.key;
+            
+            set(newTripRef, { name, date, loc }).then(() => {
+                currentTripId = tripId;
+                localStorage.setItem("lastTripId", tripId);
+                closeModal();
+                alert(`已建立：${name}`);
+            });
+        };
+
+        window.switchTrip = () => {
+            currentTripId = document.getElementById('trip-select').value;
+            localStorage.setItem("lastTripId", currentTripId);
+            loadTripData();
+            showPage('home');
+        };
+
+        function loadTripData() {
+            if(!currentTripId) return;
+            onValue(ref(db, `trips_meta/${currentTripId}`), (snap) => {
+                const data = snap.val();
+                if(data) {
+                    document.getElementById('home-title').innerText = data.name;
+                    document.getElementById('home-dates').innerText = data.date || "";
+                    if(data.loc) loadWeather(data.loc);
+                }
+            });
+        }
+
+        window.getGPS = () => {
+            if(!navigator.geolocation) return alert("瀏覽器不支援定位");
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const locStr = `${pos.coords.latitude.toFixed(4)},${pos.coords.longitude.toFixed(4)}`;
+                document.getElementById('new-trip-loc').value = locStr;
+            }, () => alert("無法取得位置，請手動輸入"));
+        };
+
+        function loadWeather(locStr) {
+            const [lat, lon] = locStr.split(',');
+            document.getElementById('weather-box').style.display = "block";
+            fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`)
+                .then(r=>r.json()).then(d => {
+                    document.getElementById('w-temp').innerText = Math.round(d.current_weather.temperature) + "°C";
+                    document.getElementById('w-city').innerText = "當地天氣";
+                    document.getElementById('w-desc').innerText = "風速: " + d.current_weather.windspeed;
+                });
+        }
+
+        // --- 匯率 API ---
+        window.fetchRate = () => {
+            const from = document.getElementById('currency-select').value;
+            const to = document.getElementById('target-currency').value;
+            const btn = document.querySelector('button[onclick="fetchRate()"]');
+            btn.innerText = "...";
+            
+            document.getElementById('rate-label').innerText = `匯率 (${from} → ${to})`;
+            document.getElementById('target-symbol').innerText = to;
+
+            fetch(`https://api.exchangerate-api.com/v4/latest/${from}`)
+                .then(response => response.json())
+                .then(data => {
+                    const rate = data.rates[to];
+                    document.getElementById('exp-rate').value = rate;
+                    window.calc(''); 
+                    btn.innerText = "🔄 更新匯率";
+                })
+                .catch(err => {
+                    console.error(err);
+                    alert("匯率更新失敗");
+                    btn.innerText = "🔄";
+                });
+        };
+
+        // --- 頁面路由 ---
+        const fieldsMap = {
+            itinerary: ['time:時間', 'title:標題', 'desc:備註'],
+            packing: ['item:物品', 'note:備註'],
+            hotels: ['name:飯店名', 'addr:地址', 'note:訂單號'],
+            restaurants: ['name:餐廳', 'link:地圖連結', 'note:必吃'],
+            shopping: ['item:商品', 'price:預算', 'place:地點'],
+            emergency: ['title:項目', 'content:內容', 'note:備註'],
+            transport: ['route:路線', 'time:時間', 'note:備註']
+        };
+
+        window.showPage = (id) => {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById('global-add-btn').style.display = (id === 'home' || id === 'expense') ? 'none' : 'flex';
+            
+            if(id === 'home') {
+                document.getElementById('home').classList.add('active');
+                return;
+            }
+            
+            currentCategory = id;
+            document.getElementById('generic-page').classList.add('active');
+            
+            const titles = { itinerary:"🗓️ 行程表", packing:"🎒 行李清單", transport:"🚆 交通", hotels:"🏨 住宿", restaurants:"🍜 餐廳", shopping:"🛍️ 購物", emergency:"🆘 緊急資料", expense:"💰 記帳" };
+            document.getElementById('page-title').innerText = titles[id] || id;
+
+            document.getElementById('expense-panel').style.display = (id === 'expense') ? 'block' : 'none';
+            document.getElementById('transport-panel').style.display = (id === 'transport') ? 'block' : 'none';
+            document.getElementById('privacy-panel').style.display = (id === 'emergency') ? 'block' : 'none';
+
+            loadListData(id);
+        };
+
+        function loadListData(cat) {
+            const list = document.getElementById('list-container');
+            if(cat === 'emergency') list.style.display = 'none'; else list.style.display = 'block';
+
+            onValue(ref(db, `trips_data/${currentTripId}/${cat}`), (snap) => {
+                list.innerHTML = "";
+                const data = snap.val();
+                if(data) {
+                    Object.entries(data).forEach(([k, v]) => {
+                        let html = `<div class="hard-box list-item"><div class="list-content">`;
+                        const mainText = v.title || v.name || v.item || v.route || v.time || "項目";
+                        html += `<div style="font-weight:900; font-size:1.1rem;">${mainText}</div>`;
+                        
+                        let sub = [];
+                        if(v.amount) sub.push(`${v.amount}`);
+                        if(v.date) sub.push(v.date);
+                        if(v.desc) sub.push(v.desc);
+                        if(v.note) sub.push(v.note);
+                        if(v.addr) sub.push(v.addr);
+                        if(v.content) sub.push(v.content);
+                        if(v.link) sub.push(`<a href="${v.link}" target="_blank">Map</a>`);
+                        
+                        html += `<div class="sub-text">${sub.join(' | ')}</div></div>`;
+                        html += `<button class="btn-delete" onclick="delItem('${cat}','${k}')">X</button></div>`;
+                        list.innerHTML += html;
+                    });
+                } else {
+                    list.innerHTML = `<div style="text-align:center; padding:20px; color:#999;">無資料</div>`;
+                }
+            });
+        }
+
+        window.openCurrentModal = () => {
+            const div = document.getElementById('dynamic-fields');
+            div.innerHTML = "";
+            (fieldsMap[currentCategory] || ['item:內容']).forEach(f => {
+                const [k, label] = f.split(':');
+                div.innerHTML += `<div class="input-group"><label>${label}</label><input id="inp-${k}" type="text"></div>`;
+            });
+            openModal('add-item');
+        };
+
+        window.saveItem = () => {
+            let data = {};
+            (fieldsMap[currentCategory] || ['item']).forEach(f => {
+                const k = f.split(':')[0];
+                data[k] = document.getElementById(`inp-${k}`).value;
+            });
+            push(ref(db, `trips_data/${currentTripId}/${currentCategory}`), data);
+            closeModal();
+        };
+
+        window.delItem = (cat, key) => {
+            if(confirm("刪除？")) remove(ref(db, `trips_data/${currentTripId}/${cat}/${key}`));
+        };
+
+        window.togglePrivacy = () => {
+            const list = document.getElementById('list-container');
+            list.style.display = list.style.display === 'none' ? 'block' : 'none';
+        };
+
+        // --- 導航功能升級 (Google / Apple / Amap) ---
+        window.startNav = (type) => {
+            const from = document.getElementById('nav-from').value;
+            const to = document.getElementById('nav-to').value;
+            if(!to) return alert("請輸入終點");
+
+            let url = "";
+            const eFrom = encodeURIComponent(from);
+            const eTo = encodeURIComponent(to);
+
+            if(type === 'google') {
+                url = `https://www.google.com/maps/dir/?api=1&destination=${eTo}&travelmode=transit`;
+                if(from) url += `&origin=${eFrom}`;
+            } else if (type === 'apple') {
+                url = `http://maps.apple.com/?daddr=${eTo}&dirflg=r`;
+                if(from) url += `&saddr=${eFrom}`;
+            } else if (type === 'amap') {
+                url = `https://uri.amap.com/navigation?keyword=${eTo}&mode=car&src=mypage`;
+            }
+            
+            window.open(url, '_blank');
+        };
+        
+        let cVal = "0";
+        window.calc = (v) => {
+            if(v === 'C') cVal = "0";
+            else cVal = cVal === "0" ? v : cVal + v;
+            
+            document.getElementById('calc-screen').innerText = cVal;
+            try { 
+                const rate = parseFloat(document.getElementById('exp-rate').value);
+                const final = Math.round(eval(cVal) * rate);
+                document.getElementById('exp-final').innerText = final;
+            } catch(e){}
+        };
+        window.saveExpense = () => {
+            const amount = document.getElementById('exp-final').innerText;
+            const symbol = document.getElementById('target-symbol').innerText;
+            if(amount == "0") return;
+            push(ref(db, `trips_data/${currentTripId}/expense`), {
+                item: document.getElementById('exp-name').value || "消費",
+                amount: `${symbol} ${amount}`,
+                date: new Date().toLocaleDateString()
+            });
+            window.calc('C');
+            document.getElementById('exp-name').value = "";
+            alert("已記帳");
+        };
+
+        window.openModal = (id) => document.getElementById(`modal-${id}`).classList.add('active');
+        window.closeModal = () => document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('active'));
+        window.delItem = delItem;
+    </script>
+</body>
+</html>
